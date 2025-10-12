@@ -7,20 +7,7 @@ using Sharp.Shared.Units;
 
 public static class DistanceUtils
 {
-    public static float GetPlayerDistance(IPlayerPawn a, IPlayerPawn b)
-    {
-        if (a == null || !a.IsValid() || b == null || !b.IsValid())
-            return -1f;
 
-        Vector posA = a.GetAbsOrigin();
-        Vector posB = b.GetAbsOrigin();
-
-        float dx = posA.X - posB.X;
-        float dy = posA.Y - posB.Y;
-        float dz = posA.Z - posB.Z;
-
-        return (float)Math.Sqrt(dx * dx + dy * dy + dz * dz);
-    }
 
     /// <summary>
     /// 隱藏指定距離內的玩家（caller 看不到他們）
@@ -57,7 +44,7 @@ public static class DistanceUtils
                 continue;
 
             var pawn = entity.AsPlayerPawn();
-            if (pawn == null || !pawn.IsValid())
+            if (!pawn.IsValid())
                 continue;
 
             // 排除自己
@@ -65,12 +52,12 @@ public static class DistanceUtils
                 continue;
 
             var targetController = pawn.GetController();
-            if (targetController == null || !targetController.IsValid())
+            if (!targetController.IsValid())
                 continue;
 
             var gameClient = clientManager.GetGameClient(targetController.PlayerSlot);
-            if (gameClient == null || !gameClient.IsValid || gameClient.IsHltv)
-                continue;
+            //if (!gameClient.IsValid || gameClient.IsHltv)
+            //    continue;
 
             // 隱藏 Pawn + Controller
             transmitManager.SetEntityState(pawn.Index, callerControllerIndex, false, channel: -1);
@@ -78,8 +65,8 @@ public static class DistanceUtils
 
             hiddenCount++;
 
-            // Debug：用 Pawn 對 Pawn 的距離
-            float distance = GetPlayerDistance(callerPawn, pawn);
+            // Debug：用 DistTo
+            float distance = callerPawn.GetAbsOrigin().DistTo(pawn.GetAbsOrigin());
             controller.Print(HudPrintChannel.Console,
                 $"[DEBUG] 隱藏玩家: {targetController.PlayerName} (SteamId={gameClient.SteamId}, PawnIndex={pawn.Index}, ControllerIndex={targetController.Index}) 距離={distance:0.0} HU");
         }

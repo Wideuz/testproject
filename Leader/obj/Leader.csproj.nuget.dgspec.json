@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\ASUS\\source\\repos\\Leader\\Leader.csproj": {}
+    "C:\\Users\\ASUS\\source\\repos\\testproject\\Leader\\Leader.csproj": {}
   },
   "projects": {
-    "C:\\Users\\ASUS\\source\\repos\\Leader\\Leader.csproj": {
+    "C:\\Users\\ASUS\\source\\repos\\testproject\\Leader\\Leader.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\ASUS\\source\\repos\\Leader\\Leader.csproj",
+        "projectUniqueName": "C:\\Users\\ASUS\\source\\repos\\testproject\\Leader\\Leader.csproj",
         "projectName": "Leader",
-        "projectPath": "C:\\Users\\ASUS\\source\\repos\\Leader\\Leader.csproj",
+        "projectPath": "C:\\Users\\ASUS\\source\\repos\\testproject\\Leader\\Leader.csproj",
         "packagesPath": "C:\\Users\\ASUS\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\ASUS\\source\\repos\\Leader\\obj\\",
+        "outputPath": "C:\\Users\\ASUS\\source\\repos\\testproject\\Leader\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\ASUS\\AppData\\Roaming\\NuGet\\NuGet.Config",
