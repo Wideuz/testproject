@@ -63,19 +63,8 @@ namespace Leader
 
         public void Shutdown()
         {
-            // 清除所有已 Hook 的 Controller
-            int removedCount = 0;
-            foreach (var controller in DistanceUtils.GetAllControllers(_sharedSystem))
-            {
-                if (controller.IsValid() &&
-                    _transmitManager.RemoveEntityHooks((IBaseEntity)controller))
-                {
-                    _logger.LogInformation($"[Leader] Removed hook for Controller {controller.PlayerName} (Slot {controller.PlayerSlot})");
-                    removedCount++;
-                }
-            }
 
-            _logger.LogInformation($"Leader shutting down, removed {removedCount} hooks");
+            _logger.LogInformation($"Shutdown Leaders");
         }
 
         public void FireGameEvent(IGameEvent e)
