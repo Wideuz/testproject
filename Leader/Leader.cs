@@ -22,6 +22,13 @@ namespace Leader
         private readonly IClientManager _clientManager;
         private readonly ITransmitManager _transmitManager;
         private readonly IEntityManager _entityManager;
+        private readonly IModSharp _modSharp;
+
+        private Guid _visibilityTimerId;
+        private IPlayerController? _callerController;
+        private float _callerDistance;
+        private float _lastDistance = -1f;
+        private bool _isHiding = false;
 
         public int ListenerVersion => IEventListener.ApiVersion;
         public int ListenerPriority => 0;
@@ -39,32 +46,23 @@ namespace Leader
             _clientManager = _sharedSystem.GetClientManager();
             _transmitManager = _sharedSystem.GetTransmitManager();
             _entityManager = _sharedSystem.GetEntityManager();
+            _modSharp = _sharedSystem.GetModSharp();
         }
 
-        public bool Init()
-        {
-            _logger.LogInformation("Leader initializing");
-            return true;
-        }
+        public bool Init() => true;
 
         public void PostInit()
         {
-            // 註冊指令
             _clientManager.InstallCommandCallback("leader", OnLeaderCommand);
             _clientManager.InstallCommandCallback("hide", OnHideCommand);
 
-            // 註冊事件監聽器
             _events.HookEvent("player_connect_full");
-            _events.HookEvent("player_spawn");
             _events.InstallEventListener(this);
-
-            _logger.LogInformation("Leader post-initialized");
         }
 
         public void Shutdown()
         {
-
-            _logger.LogInformation($"Shutdown Leaders");
+            StopVisibilityMonitor(true);
         }
 
         public void FireGameEvent(IGameEvent e)
@@ -76,10 +74,7 @@ namespace Leader
                 if (controller != null && controller.IsValid())
                 {
                     if (!_transmitManager.IsEntityHooked(controller))
-                    {
-                        _transmitManager.AddEntityHooks((IBaseEntity)controller, defaultTransmit: true);
-                        _logger.LogInformation($"[Leader] Hooked transmit for {controller.PlayerName} (Slot {slot}) via {e.Name}");
-                    }
+                        _transmitManager.AddEntityHooks(controller, defaultTransmit: true);
                 }
             }
         }
@@ -97,14 +92,9 @@ namespace Leader
             }
 
             if (LeaderMethod.AssignLeader(controller))
-            {
                 controller.Print(HudPrintChannel.Chat, "✅ 你現在是指揮官！");
-                _logger.LogInformation($"Leader assigned via command: {controller.PlayerName} ({controller.SteamId})");
-            }
             else
-            {
                 controller.Print(HudPrintChannel.Chat, "⚠️ 指定失敗，請確認你是有效玩家！");
-            }
 
             return ECommandAction.Handled;
         }
@@ -115,21 +105,67 @@ namespace Leader
             if (controller is null || !controller.IsValid())
                 return ECommandAction.Handled;
 
-            if (string.IsNullOrWhiteSpace(command.ArgString))
+            if (!float.TryParse(command.ArgString, out float distance))
             {
-                controller.Print(HudPrintChannel.Chat, "⚠️ 請輸入距離，例如 /hide 500");
+                controller.Print(HudPrintChannel.Chat, "⚠️ 請輸入距離，例如 !hide 500, !hide 0 (全範圍), !hide -1 (取消)");
                 return ECommandAction.Handled;
             }
 
-            if (!float.TryParse(command.ArgString, out float distance) || distance <= 0)
+            // -1 或重複輸入相同距離 → 取消隱藏
+            if (distance == -1 || (_isHiding && Math.Abs(distance - _lastDistance) < 0.01f))
             {
-                controller.Print(HudPrintChannel.Chat, "⚠️ 距離必須是正數，例如 /hide 500");
+                StopVisibilityMonitor(true);
+                controller.Print(HudPrintChannel.Chat, "👁 已取消隱藏，恢復顯示所有玩家");
+                _isHiding = false;
+                _lastDistance = -1f;
+                _callerController = null;
+                _callerDistance = 0f;
                 return ECommandAction.Handled;
             }
 
-            DistanceUtils.HideNearbyPlayers(controller, distance, _sharedSystem);
+            // 0 = 全範圍
+            if (distance == 0)
+                distance = float.MaxValue;
+
+            _callerController = controller;
+            _callerDistance = distance;
+            _lastDistance = distance;
+            _isHiding = true;
+
+            // 立即更新一次
+            DistanceUtils.UpdateVisibility(_callerController, _callerDistance, _sharedSystem);
+
+            StartVisibilityMonitor();
+            controller.Print(HudPrintChannel.Chat, $"🔄 開始實時隱藏範圍內玩家（距離 {(distance == float.MaxValue ? "全範圍" : distance.ToString("0"))} HU）");
+
             return ECommandAction.Handled;
+        }
+
+        private void StartVisibilityMonitor()
+        {
+            if (_modSharp.IsValidTimer(_visibilityTimerId))
+                _modSharp.StopTimer(_visibilityTimerId);
+
+            // 使用 REPEAT 確保持續執行
+            _visibilityTimerId = _modSharp.PushTimer(() =>
+            {
+                if (_isHiding && _callerController != null && _callerController.IsValid())
+                    DistanceUtils.UpdateVisibility(_callerController, _callerDistance, _sharedSystem);
+            }, interval: 1.0, flags: GameTimerFlags.Repeatable);
+        }
+
+        private void StopVisibilityMonitor(bool stopAndUnhide)
+        {
+            if (_modSharp.IsValidTimer(_visibilityTimerId))
+                _modSharp.StopTimer(_visibilityTimerId);
+
+            if (stopAndUnhide && _callerController != null && _callerController.IsValid())
+                DistanceUtils.UnhideAllForCaller(_callerController, _sharedSystem);
         }
     }
 }
+
+
+
+
 
