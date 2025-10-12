@@ -1,17 +1,14 @@
 ﻿using Microsoft.Extensions.Logging;
 using Sharp.Shared;
 using Sharp.Shared.Enums;
+using Sharp.Shared.GameEntities;
 using Sharp.Shared.Listeners;
 using Sharp.Shared.Managers;
 using Sharp.Shared.Objects;
 using Sharp.Shared.Types;
+using Sharp.Shared.Units;
 using System;
 
-/////
-///
-/// Leader 
-///
-/////
 namespace Leader
 {
     public sealed class Leader : IModSharpModule, IEventListener
@@ -19,13 +16,15 @@ namespace Leader
         public string DisplayName => "Leader";
         public string DisplayAuthor => "Widez";
 
-        public int ListenerVersion => 1;
-        public int ListenerPriority => 0;
-
         private readonly ILogger<Leader> _logger;
         private readonly ISharedSystem _sharedSystem;
         private readonly IEventManager _events;
         private readonly IClientManager _clientManager;
+        private readonly ITransmitManager _transmitManager;
+        private readonly IEntityManager _entityManager;
+
+        public int ListenerVersion => IEventListener.ApiVersion;
+        public int ListenerPriority => 0;
 
         public Leader(ISharedSystem sharedSystem,
             string? dllPath = null,
@@ -34,11 +33,12 @@ namespace Leader
             Microsoft.Extensions.Configuration.IConfiguration? coreConfiguration = null,
             bool hotReload = false)
         {
-
             _sharedSystem = sharedSystem ?? throw new ArgumentNullException(nameof(sharedSystem));
             _logger = _sharedSystem.GetLoggerFactory().CreateLogger<Leader>();
             _events = _sharedSystem.GetEventManager();
             _clientManager = _sharedSystem.GetClientManager();
+            _transmitManager = _sharedSystem.GetTransmitManager();
+            _entityManager = _sharedSystem.GetEntityManager();
         }
 
         public bool Init()
@@ -49,31 +49,58 @@ namespace Leader
 
         public void PostInit()
         {
-            var clientManager = _sharedSystem.GetClientManager();
-            clientManager.InstallCommandCallback("leader", OnLeaderCommand); // 註冊 ms_leader 指令
+            // 註冊指令
+            _clientManager.InstallCommandCallback("leader", OnLeaderCommand);
             _clientManager.InstallCommandCallback("hide", OnHideCommand);
+
+            // 註冊事件監聽器
+            _events.HookEvent("player_connect_full");
+            _events.HookEvent("player_spawn");
+            _events.InstallEventListener(this);
+
             _logger.LogInformation("Leader post-initialized");
         }
 
         public void Shutdown()
         {
-            _logger.LogInformation("Leader shutting down");
+            // 清除所有已 Hook 的 Controller
+            int removedCount = 0;
+            foreach (var controller in DistanceUtils.GetAllControllers(_sharedSystem))
+            {
+                if (controller.IsValid() &&
+                    _transmitManager.RemoveEntityHooks((IBaseEntity)controller))
+                {
+                    _logger.LogInformation($"[Leader] Removed hook for Controller {controller.PlayerName} (Slot {controller.PlayerSlot})");
+                    removedCount++;
+                }
+            }
+
+            _logger.LogInformation($"Leader shutting down, removed {removedCount} hooks");
         }
 
-        public void FireGameEvent(IGameEvent ev)
+        public void FireGameEvent(IGameEvent e)
         {
-            
+            if (e.Name == "player_connect_full")
+            {
+                var slot = (PlayerSlot)e.GetInt("slot");
+                var controller = _entityManager.FindPlayerControllerBySlot(slot);
+                if (controller != null && controller.IsValid())
+                {
+                    if (!_transmitManager.IsEntityHooked(controller))
+                    {
+                        _transmitManager.AddEntityHooks((IBaseEntity)controller, defaultTransmit: true);
+                        _logger.LogInformation($"[Leader] Hooked transmit for {controller.PlayerName} (Slot {slot}) via {e.Name}");
+                    }
+                }
+            }
         }
-
 
         private ECommandAction OnLeaderCommand(IGameClient client, StringCommand command)
         {
-            var entityManager = _sharedSystem.GetEntityManager();
-            var controller = entityManager.FindPlayerControllerBySlot(client.Slot);
-            if (controller == null || !controller.IsValid())
+            var controller = _entityManager.FindPlayerControllerBySlot(client.Slot);
+            if (controller is null || !controller.IsValid())
                 return ECommandAction.Handled;
 
-            // ✅ 先檢查是否已經是 Leader
             if (LeaderMethod.IsLeader(controller))
             {
                 controller.Print(HudPrintChannel.Chat, "ℹ️ 你已經是指揮官！");
@@ -95,9 +122,8 @@ namespace Leader
 
         private ECommandAction OnHideCommand(IGameClient client, StringCommand command)
         {
-            var entityManager = _sharedSystem.GetEntityManager();
-            var controller = entityManager.FindPlayerControllerBySlot(client.Slot);
-            if (controller == null || !controller.IsValid())
+            var controller = _entityManager.FindPlayerControllerBySlot(client.Slot);
+            if (controller is null || !controller.IsValid())
                 return ECommandAction.Handled;
 
             if (string.IsNullOrWhiteSpace(command.ArgString))
@@ -115,6 +141,6 @@ namespace Leader
             DistanceUtils.HideNearbyPlayers(controller, distance, _sharedSystem);
             return ECommandAction.Handled;
         }
-
     }
 }
+
