@@ -36,6 +36,8 @@ namespace Leader
 
         public int ListenerVersion => IEventListener.ApiVersion;
         public int ListenerPriority => 0;
+        int IGameListener.ListenerVersion => IGameListener.ApiVersion;
+        int IGameListener.ListenerPriority => 0;
 
         public Leader(ISharedSystem sharedSystem,
             string? dllPath = null,
@@ -126,6 +128,9 @@ namespace Leader
 
         private ECommandAction OnMarkerCommand(IGameClient client, StringCommand command)
         {
+            if (!client.IsValid)
+                return ECommandAction.Handled;
+
             var controller = _entityManager.FindPlayerControllerBySlot(client.Slot);
             if (controller is null || !controller.IsValid())
                 return ECommandAction.Handled;
@@ -143,36 +148,37 @@ namespace Leader
             var eyePos = pawn.GetEyePosition();
             var eyeAngles = pawn.GetEyeAngles();
             var forward = AngleToForward(eyeAngles);
-            forward.Normalize(); // 這裡用 Normalize()
+            forward.Normalize();
 
             var endPos = eyePos + forward * maxDistance;
 
             // 2) 呼叫物理檢測
             var physics = _sharedSystem.GetPhysicsQueryManager();
-
-            var flags = TraceQueryFlag.All;
-
             var trace = physics.TraceLineNoPlayers(
                 eyePos,
                 endPos,
                 InteractionLayers.Solid,
-                (CollisionGroupType)0, // 或 CollisionGroupType.COLLISION_GROUP_NONE
-                flags,
+                (CollisionGroupType)0,
+                TraceQueryFlag.All,
                 InteractionLayers.None,
                 pawn
             );
 
-            // TraceResult 沒有 HitPosition，要用 EndPos
             var hitPos = trace.DidHit() ? trace.HitPoint : trace.EndPosition;
             var placePos = hitPos + new Vector(0, 0, 1.0f);
 
-            var gameRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, @"..\.."));
-            var fullPath = Path.Combine(gameRoot, "custom", "particles", "leader_a_1.vpcf");
-            _modSharp.DispatchParticleEffect(fullPath, placePos, new Vector(0, 0, 0));
+            // 3) 播放粒子特效 (直接用 vpcf)
+            // 注意：這裡的路徑要跟遊戲資源一致，例如 "particles/leader_a_1.vpcf"
+            _modSharp.DispatchParticleEffect(
+                "custom/particles/leader_a_1.vpcf",
+                placePos,
+                new Vector(0, 0, 0) // 粒子角度
+            );
 
             controller.Print(HudPrintChannel.Chat, "已在準心位置放置標記！");
             return ECommandAction.Stopped;
         }
+
 
         // 工具函式：角度轉 forward 向量
         private static Vector AngleToForward(Vector angles)

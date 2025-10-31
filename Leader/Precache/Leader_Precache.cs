@@ -20,7 +20,7 @@ namespace Leader.Precache
 
         public void Init()
         {
-            var gameRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, @"..\.."));
+            var gameRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, @".."));
             var fullPath = Path.Combine(gameRoot, "custom", "particles");
 
             _logger.LogInformation("Game root: {Root}", gameRoot);
