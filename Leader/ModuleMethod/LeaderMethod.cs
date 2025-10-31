@@ -2,7 +2,7 @@
 using Sharp.Shared.Units;
 using System.Collections.Generic;
 
-namespace Leader
+namespace Leader.ModuleMethod
 {
     public static class LeaderMethod
     {

@@ -53,7 +53,7 @@ public static class DistanceUtils
                 if (!transmitManager.IsEntityHooked(targetController))
                     transmitManager.AddEntityHooks(targetController, defaultTransmit: true);
 
-                transmitManager.SetEntityState(targetController.Index, callerIndex, false, channel: -1);
+                transmitManager.SetEntityState(targetController.Index, callerIndex, false, channel: 2);
                 _hiddenPairs.Add(pair);
             }
         }
@@ -64,7 +64,7 @@ public static class DistanceUtils
         {
             if (pair.caller == callerIndex && !currentPairs.Contains(pair))
             {
-                transmitManager.SetEntityState(pair.target, callerIndex, true, channel: -1);
+                transmitManager.SetEntityState(pair.target, callerIndex, true, channel: 2);
                 toUnhide.Add(pair);
             }
         }
@@ -89,7 +89,7 @@ public static class DistanceUtils
         {
             if (pair.caller == callerIndex)
             {
-                transmitManager.SetEntityState(pair.target, callerIndex, true, channel: -1);
+                transmitManager.SetEntityState(pair.target, callerIndex, true, channel: 2);
                 toUnhide.Add(pair);
             }
         }
